@@ -4,38 +4,55 @@
 #
 
 import psycopg2
+import contextlib
 
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    try:
+        return psycopg2.connect("dbname=tournament")
+    except:
+        print("Connection Failed.")
+
+
+@contextlib.contextmanager
+def get_cursor():
+    """
+    Query helper function using context lib. Creates a cursor from a database
+    connection object, and performs queries using that cursor.
+    Special thanks to code reviewer Kyle for sharing this code and showing
+    how not to repeat oneself when doing db operations!
+    """
+    DB = connect()
+    cursor = DB.cursor()
+    try:
+        yield cursor
+    except:
+        raise
+    else:
+        DB.commit()
+    finally:
+        cursor.close()
+        DB.close()
 
 
 def deleteMatches():
     """Remove all the match records from the database."""
-    db = connect()
-    c = db.cursor()
-    c.execute("DELETE FROM matches;")
-    db.commit()
-    db.close()
+    with get_cursor() as cursor:
+        cursor.execute("DELETE FROM matches;")
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    db = connect()
-    c = db.cursor()
-    c.execute("DELETE FROM players;")
-    db.commit()
-    db.close()
+    with get_cursor() as cursor:
+        cursor.execute("DELETE FROM players;")
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    db = connect()
-    c = db.cursor()
-    c.execute("SELECT count(*) FROM players;")
-    num = c.fetchall()[0][0]
-    db.close()
+    with get_cursor() as cursor:
+        cursor.execute("SELECT COUNT(id) FROM players;")
+        num = cursor.fetchone()[0]
 
     return num
 
@@ -49,11 +66,8 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    db = connect()
-    c = db.cursor()
-    c.execute("INSERT INTO players (name) VALUES (%s);", (name,))
-    db.commit()
-    db.close()
+    with get_cursor() as cursor:
+        cursor.execute("INSERT INTO players (name) VALUES (%s);", (name,))
 
 
 def playerStandings():
@@ -69,11 +83,10 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    db = connect()
-    c = db.cursor()
-    c.execute("SELECT * FROM standings;")
-    standings = [(row[0], row[1], row[2], row[3]) for row in c.fetchall()]
-    db.close()
+    with get_cursor() as cursor:
+        cursor.execute("SELECT * FROM standings;")
+        standings = [(row[0], row[1], row[2], row[3]) \
+                    for row in cursor.fetchall()]
 
     return standings
 
@@ -85,12 +98,10 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    db = connect()
-    c = db.cursor()
-    c.execute("INSERT INTO matches (winner, loser) VALUES (%s,%s);",
+    with get_cursor() as cursor:
+        cursor.execute("INSERT INTO matches (winner, loser) VALUES (%s,%s);",
         (winner, loser))
-    db.commit()
-    db.close()
+
 
 def isRematch(player1, player2):
     """Returns true if players have already competed against each other
@@ -99,12 +110,10 @@ def isRematch(player1, player2):
       player 1: the id number of one player
       player 2: the id number of the other player
     """
-    db = connect()
-    c = db.cursor()
-    c.execute("SELECT * FROM matches WHERE winner = %s AND loser = %s \
+    with get_cursor() as cursor:
+        cursor.execute("SELECT * FROM matches WHERE winner = %s AND loser = %s \
         OR winner = %s AND loser = %s;", (player1, player2, player2, player1))
-    rows = len(c.fetchall())
-    db.close()
+        rows = len(cursor.fetchall())
 
     if rows == 0:
         return False
