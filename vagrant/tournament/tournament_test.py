@@ -146,10 +146,82 @@ def testPairings():
                 "After one match, players with one win should be paired.")
     print "10. After one match, players with one win are properly paired."
 
+def testIsRematch():
+    """
+    Test that isRematch() returns False when two players haven't yet played
+    each other and True if they have.
+    """
+    deleteMatches()
+    deletePlayers()
+    registerPlayer("Twilight Sparkle")
+    registerPlayer("Fluttershy")
+    registerPlayer("Applejack")
+    registerPlayer("Pinkie Pie")
+    standings = playerStandings()
+    [id1, id2, id3, id4] = [row[0] for row in standings]
+    reportMatch(id1, id2)
+    if isRematch(id3, id4):
+        raise ValueError(
+            "A match with two new players should not be flagged as a rematch")
+    if isRematch(id2, id3):
+        raise ValueError(
+            "A match between two players who haven't played each other should"
+            "not be flagged as a rematch")
+    if not isRematch(id1, id2):
+        raise ValueError(
+            "A match between two players who have played each other already"
+            "should be flagged as a rematch"
+        )
+    print "11. isRematch() behaves as expected"
+
+def testPairingsWithRematch():
+    """
+    Test that pairings are generated such that they do not result
+    in rematches unless this is unavoidable.
+    """
+    deleteMatches()
+    deletePlayers()
+    registerPlayer("Applejack")
+    registerPlayer("Fluttershy")
+    registerPlayer("Pinkie Pie")
+    registerPlayer("Twilight Sparkle")
+    standings = playerStandings()
+    [id1, id2, id3, id4] = [row[0] for row in standings]
+    reportMatch(id1, id2)
+    reportMatch(id3, id4)
+    pairings = swissPairings()
+    if pairings[0][0] != id1 or pairings[0][2] != id3:
+        raise ValueError(
+            "Player 1 should oppose Player 3 in the second round")
+    if pairings[1][0] != id2 or pairings[1][2] != id4:
+        raise ValueError(
+            "Player 2 should oppose Player 4 in the second round")
+    reportMatch(id1, id3)
+    reportMatch(id2, id4)
+    pairings = swissPairings()
+    if pairings[0][0] != id1 or pairings[0][2] != id4:
+        raise ValueError(
+            "Player 1 should oppose Player 4 in the third round")
+    if pairings[1][0] != id2 or pairings[1][2] != id3:
+        raise ValueError(
+            "Player 2 should oppose Player 3 in the third round")
+    reportMatch(id1, id4)
+    reportMatch(id2, id3)
+    pairings = swissPairings()
+    if pairings[0][0] != id1 or pairings[0][2] != id2:
+        raise ValueError(
+            "Player 1 should oppose Player 2 in the fourth round")
+    if pairings[1][0] != id3 or pairings[1][2] != id4:
+        raise ValueError(
+            "Player 3 should oppose Player 4 in the fourth round")
+    print "12. Players do not get rematched unless there's no other option."
+
 
 if __name__ == '__main__':
     testCount()
     testStandingsBeforeMatches()
     testReportMatches()
     testPairings()
+    testIsRematch()
+    testPairingsWithRematch()
     print "Success!  All tests pass!"
